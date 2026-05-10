@@ -1,6 +1,6 @@
 # Map projection converter
 
-Most softwares don't support converting map projections back to equirectangular, so this is a half-assed solution to that.
+Most software doesn't support converting map projections back to equirectangular, so this is a half-assed solution to that. It now also supports converting equirectangular maps into other projections. Use the conversion direction selector in the UI to switch between projection → equirectangular and equirectangular → projection.
 
 Currently supported projections:
 
@@ -10,6 +10,7 @@ Currently supported projections:
 - Winkel Tripel
 
 No guarantees that any of these will be perfectly accurate.
+Inverse projections (equirectangular → projection) use numeric solvers for some projections, so small artifacts and edge clipping are expected.
 
 This repo primarily exists so that if my hosting of the website goes down people can still use the scripts.
 

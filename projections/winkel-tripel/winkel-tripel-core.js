@@ -25,6 +25,46 @@ function winkelTripelForward(lambda, phi) {
   };
 }
 
+function winkelTripelInverse(x, y) {
+  let lambda = (x / WINKEL_X_MAX) * Math.PI;
+  let phi = (y / WINKEL_Y_MAX) * (Math.PI / 2);
+  const tol = 1e-7;
+  const delta = 1e-6;
+
+  for (let i = 0; i < 12; i++) {
+    const proj = winkelTripelForward(lambda, phi);
+    const fx = proj.x - x;
+    const fy = proj.y - y;
+    if (Math.abs(fx) + Math.abs(fy) < tol) {
+      return { lambda, phi };
+    }
+
+    const projL = winkelTripelForward(lambda + delta, phi);
+    const projP = winkelTripelForward(lambda, phi + delta);
+    const dFx_dL = (projL.x - proj.x) / delta;
+    const dFy_dL = (projL.y - proj.y) / delta;
+    const dFx_dP = (projP.x - proj.x) / delta;
+    const dFy_dP = (projP.y - proj.y) / delta;
+    const det = dFx_dL * dFy_dP - dFx_dP * dFy_dL;
+
+    if (Math.abs(det) < 1e-12) break;
+
+    const dLambda = (-fx * dFy_dP + fy * dFx_dP) / det;
+    const dPhi = (-dFx_dL * fy + dFy_dL * fx) / det;
+    lambda += dLambda;
+    phi += dPhi;
+    lambda = Math.max(-Math.PI, Math.min(Math.PI, lambda));
+    phi = Math.max(-Math.PI / 2, Math.min(Math.PI / 2, phi));
+  }
+
+  const finalProj = winkelTripelForward(lambda, phi);
+  if (Math.abs(finalProj.x - x) + Math.abs(finalProj.y - y) < tol * 10) {
+    return { lambda, phi };
+  }
+
+  return null;
+}
+
 function winkelTripelConvertPixels(src, srcW, srcH) {
   const srcWmax = srcW - 1;
   const srcHmax = srcH - 1;
@@ -99,6 +139,53 @@ function winkelTripelConvertPixels(src, srcW, srcH) {
         src[i10 + 3] * w10 +
         src[i01 + 3] * w01 +
         src[i11 + 3] * w11;
+    }
+  }
+
+  return { out: out, width: outW, height: outH };
+}
+
+function winkelTripelConvertFromEquirectangularPixels(src, srcW, srcH) {
+  const aspectRatio = WINKEL_X_MAX / WINKEL_Y_MAX;
+  const outW = srcW;
+  const outH = Math.round(outW / aspectRatio);
+  const out = new Uint8ClampedArray(outW * outH * 4);
+  const bounds = {
+    xMin: -WINKEL_X_MAX,
+    xMax: WINKEL_X_MAX,
+    yMin: -WINKEL_Y_MAX,
+    yMax: WINKEL_Y_MAX,
+  };
+
+  for (let y = 0; y < outH; y++) {
+    const outRowBase = y * outW * 4;
+    for (let x = 0; x < outW; x++) {
+      const proj = ProjectionUtils.pixelToProjected(x, y, bounds, outW, outH);
+      const inv = winkelTripelInverse(proj.x, proj.y);
+      if (!inv) {
+        const oi = outRowBase + x * 4;
+        out[oi] = 0;
+        out[oi + 1] = 0;
+        out[oi + 2] = 0;
+        out[oi + 3] = 0;
+        continue;
+      }
+
+      const srcPos = ProjectionUtils.latLonToEquirectangular(
+        inv.lambda,
+        inv.phi,
+        srcW,
+        srcH,
+      );
+      ProjectionUtils.sampleBilinear(
+        src,
+        srcW,
+        srcH,
+        srcPos.x,
+        srcPos.y,
+        out,
+        outRowBase + x * 4,
+      );
     }
   }
 
