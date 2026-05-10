@@ -21,6 +21,22 @@ function robinsonInterpolate(absPhiDeg) {
   };
 }
 
+function robinsonInversePhi(absY) {
+  if (absY <= 0) return 0;
+  if (absY >= 1) return 90;
+
+  for (let i = 0; i < ROBINSON_Y.length - 1; i++) {
+    const y0 = ROBINSON_Y[i];
+    const y1 = ROBINSON_Y[i + 1];
+    if (absY >= y0 && absY <= y1) {
+      const t = (absY - y0) / (y1 - y0);
+      return (i + t) * 5;
+    }
+  }
+
+  return 90;
+}
+
 function robinsonConvertPixels(src, srcW, srcH) {
   const srcWmax = srcW - 1;
   const srcHmax = srcH - 1;
@@ -80,6 +96,72 @@ function robinsonConvertPixels(src, srcW, srcH) {
         src[i10 + 3] * w10 +
         src[i01 + 3] * w01 +
         src[i11 + 3] * w11;
+    }
+  }
+
+  return { out: out, width: outW, height: outH };
+}
+
+function robinsonConvertFromEquirectangularPixels(src, srcW, srcH) {
+  const aspectRatio = ROBINSON_X_MAX / ROBINSON_Y_MAX;
+  const outW = srcW;
+  const outH = Math.round(outW / aspectRatio);
+  const out = new Uint8ClampedArray(outW * outH * 4);
+  const bounds = {
+    xMin: -ROBINSON_X_MAX,
+    xMax: ROBINSON_X_MAX,
+    yMin: -ROBINSON_Y_MAX,
+    yMax: ROBINSON_Y_MAX,
+  };
+
+  for (let y = 0; y < outH; y++) {
+    const outRowBase = y * outW * 4;
+    for (let x = 0; x < outW; x++) {
+      const proj = ProjectionUtils.pixelToProjected(x, y, bounds, outW, outH);
+      const absY = Math.abs(proj.y) / ROBINSON_Y_MAX;
+
+      if (absY > 1) {
+        const oi = outRowBase + x * 4;
+        out[oi] = 0;
+        out[oi + 1] = 0;
+        out[oi + 2] = 0;
+        out[oi + 3] = 0;
+        continue;
+      }
+
+      const absPhiDeg = robinsonInversePhi(absY);
+      const phi =
+        ((proj.y >= 0 ? 1 : -1) * absPhiDeg * Math.PI) / 180;
+      const r = robinsonInterpolate(absPhiDeg);
+      const maxX = 0.8487 * Math.PI * r.plen;
+
+      if (Math.abs(proj.x) > maxX || r.plen === 0) {
+        const oi = outRowBase + x * 4;
+        out[oi] = 0;
+        out[oi + 1] = 0;
+        out[oi + 2] = 0;
+        out[oi + 3] = 0;
+        continue;
+      }
+
+      let lambda = proj.x / (0.8487 * r.plen);
+      lambda = Math.max(-Math.PI, Math.min(Math.PI, lambda));
+
+      const srcPos = ProjectionUtils.latLonToEquirectangular(
+        lambda,
+        phi,
+        srcW,
+        srcH,
+      );
+      ProjectionUtils.sampleBilinear(
+        src,
+        srcW,
+        srcH,
+        srcPos.x,
+        srcPos.y,
+        out,
+        outRowBase + x * 4,
+      );
     }
   }
 

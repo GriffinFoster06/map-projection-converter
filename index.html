@@ -25,7 +25,7 @@
     <header>
       <div class="header-text">
         <h1>Map Projection Converter</h1>
-        <p class="subtitle">Convert various map projections to equirectangular.</p>
+        <p class="subtitle">Convert maps between equirectangular and other projections.</p>
       </div>
       <div class="header-kofi">
         <a class="request-btn" href="https://github.com/Nystik-gh/map-projection-converter/issues" target="_blank" rel="noopener">Request projection</a>
@@ -50,7 +50,15 @@
           </div>
 
           <div class="form-group">
-            <label for="projectionSelect">Source Projection</label>
+            <label for="directionSelect">Conversion Direction</label>
+            <select id="directionSelect">
+              <option value="to-equirectangular">Projection → Equirectangular</option>
+              <option value="from-equirectangular">Equirectangular → Projection</option>
+            </select>
+          </div>
+
+          <div class="form-group">
+            <label for="projectionSelect" id="projectionLabel">Source Projection</label>
             <select id="projectionSelect"></select>
           </div>
 
@@ -87,7 +95,7 @@
       <div id="previewSection" class="preview-section" style="display: none;">
         <div class="preview-pane">
           <div class="pane-head">
-            <h3>Input</h3>
+              <h3 id="inputTitle">Input</h3>
             <span class="dims" id="inputDims"></span>
           </div>
           <div class="canvas-wrapper">
@@ -101,7 +109,7 @@
 
         <div class="preview-pane">
           <div class="pane-head">
-            <h3>Equirectangular Output</h3>
+              <h3 id="outputTitle">Equirectangular Output</h3>
           </div>
           <div class="canvas-wrapper">
             <canvas id="outputCanvas"></canvas>

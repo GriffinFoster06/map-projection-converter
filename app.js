@@ -3,8 +3,10 @@ let currentImage = null;
 let currentFileName = null;
 let outputCanvasCache = null;
 let globePreview = null;
+let currentDirection = 'to-equirectangular';
 
 function initializeApp() {
+  const directionSelect = document.getElementById('directionSelect');
   const projectionSelect = document.getElementById('projectionSelect');
   const configContainer = document.getElementById('projectionConfig');
   const fileInput = document.getElementById('fileInput');
@@ -13,6 +15,8 @@ function initializeApp() {
   const fileChipName = document.getElementById('fileChipName');
   const replaceBtn = document.getElementById('replaceBtn');
   const allProjections = getAllProjections();
+
+  currentDirection = directionSelect.value;
 
   allProjections.forEach(projection => {
     const option = document.createElement('option');
@@ -23,11 +27,21 @@ function initializeApp() {
 
   currentProjection = allProjections[0];
   currentProjection.renderConfig(configContainer, performConversion);
+  updateDirectionLabels();
 
   projectionSelect.addEventListener('change', (e) => {
     currentProjection = getProjectionById(e.target.value);
     currentProjection.renderConfig(configContainer, performConversion);
+    updateDirectionLabels();
 
+    if (currentImage) {
+      performConversion();
+    }
+  });
+
+  directionSelect.addEventListener('change', (e) => {
+    currentDirection = e.target.value;
+    updateDirectionLabels();
     if (currentImage) {
       performConversion();
     }
@@ -89,6 +103,10 @@ function initializeApp() {
 function getPreparedImage() {
   const config = currentProjection.getConfig();
 
+  if (currentDirection === 'from-equirectangular') {
+    return ProjectionUtils.prepareEquirectangular(currentImage, config);
+  }
+
   if (currentProjection.prepareImage) {
     return currentProjection.prepareImage(currentImage, config);
   }
@@ -108,7 +126,7 @@ function updateInputPreview() {
   inputCanvas.height = processedImage.height;
   inputCtx.drawImage(processedImage, 0, 0);
 
-  if (currentProjection.renderInputOverlay) {
+  if (currentDirection === 'to-equirectangular' && currentProjection.renderInputOverlay) {
     currentProjection.renderInputOverlay(inputCtx, processedImage.width, processedImage.height);
   }
 
@@ -136,7 +154,11 @@ function performConversion() {
     const outputCanvas = document.getElementById('outputCanvas');
     const actionSection = document.getElementById('actionSection');
 
-    outputCanvasCache = currentProjection.convert(processedImage);
+    if (currentDirection === 'to-equirectangular') {
+      outputCanvasCache = currentProjection.toEquirectangular(processedImage);
+    } else {
+      outputCanvasCache = currentProjection.fromEquirectangular(processedImage);
+    }
 
     outputCanvas.width = outputCanvasCache.width;
     outputCanvas.height = outputCanvasCache.height;
@@ -145,7 +167,11 @@ function performConversion() {
 
     actionSection.style.display = 'block';
 
-    showGlobePreview(outputCanvasCache);
+    if (currentDirection === 'to-equirectangular') {
+      showGlobePreview(outputCanvasCache);
+    } else {
+      hideGlobePreview();
+    }
 
     inputOverlay.style.display = 'none';
     outputOverlay.style.display = 'none';
@@ -186,13 +212,17 @@ function downloadResult() {
   const downloadBtn = document.getElementById('downloadBtn');
   const spinner = document.getElementById('downloadSpinner');
   const base = (currentFileName || 'map').replace(/\.[^/.]+$/, '');
-  const downloadName = `${base}-equirectangular.png`;
+  const downloadName = `${base}-${getOutputSlug()}.png`;
+  const convertFullRes =
+    currentDirection === 'to-equirectangular'
+      ? currentProjection.toEquirectangularFullRes
+      : currentProjection.fromEquirectangularFullRes;
 
-  if (currentProjection.convertFullRes) {
+  if (convertFullRes) {
     downloadBtn.disabled = true;
     spinner.style.display = 'flex';
 
-    currentProjection.convertFullRes(processedImage).then(function(canvas) {
+    convertFullRes(processedImage).then(function(canvas) {
       canvas.toBlob(function(blob) {
         const a = document.createElement('a');
         a.href = URL.createObjectURL(blob);
@@ -213,6 +243,27 @@ function downloadResult() {
       a.download = downloadName;
       a.click();
     }, 'image/png');
+  }
+}
+
+function getOutputSlug() {
+  if (currentDirection === 'to-equirectangular') return 'equirectangular';
+  return currentProjection.id;
+}
+
+function updateDirectionLabels() {
+  const projectionLabel = document.getElementById('projectionLabel');
+  const inputTitle = document.getElementById('inputTitle');
+  const outputTitle = document.getElementById('outputTitle');
+
+  if (currentDirection === 'to-equirectangular') {
+    projectionLabel.textContent = 'Source Projection';
+    inputTitle.textContent = `${currentProjection.name} Input`;
+    outputTitle.textContent = 'Equirectangular Output';
+  } else {
+    projectionLabel.textContent = 'Target Projection';
+    inputTitle.textContent = 'Equirectangular Input';
+    outputTitle.textContent = `${currentProjection.name} Output`;
   }
 }
 

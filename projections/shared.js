@@ -1,4 +1,5 @@
 const PROJ_PREVIEW_MAX_HEIGHT = 1000;
+const EQUIRECTANGULAR_ASPECT_RATIO = 2;
 
 const ProjectionUtils = {
   getSourceData(image) {
@@ -31,6 +32,31 @@ const ProjectionUtils = {
       Math.max(image.width, image.height) / scale,
     );
     const canvasWidth = Math.round(canvasHeight * aspectRatio);
+
+    const prepared = document.createElement("canvas");
+    prepared.width = canvasWidth;
+    prepared.height = canvasHeight;
+    const ctx = prepared.getContext("2d");
+
+    const scaledWidth = image.width * (canvasHeight / image.height) * scale;
+    const scaledHeight = canvasHeight * scale;
+    const offsetX = (canvasWidth - scaledWidth) / 2 + userOffsetX;
+    const offsetY = (canvasHeight - scaledHeight) / 2 + userOffsetY;
+
+    ctx.drawImage(image, offsetX, offsetY, scaledWidth, scaledHeight);
+    return prepared;
+  },
+
+  prepareEquirectangular(image, config) {
+    const scale = config.scale || 1;
+    const userOffsetX = config.offsetX || 0;
+    const userOffsetY = config.offsetY || 0;
+    const baseHeight = Math.max(
+      image.height,
+      image.width / EQUIRECTANGULAR_ASPECT_RATIO,
+    );
+    const canvasHeight = Math.round(baseHeight / scale);
+    const canvasWidth = Math.round(canvasHeight * EQUIRECTANGULAR_ASPECT_RATIO);
 
     const prepared = document.createElement("canvas");
     prepared.width = canvasWidth;
@@ -132,6 +158,94 @@ const ProjectionUtils = {
       };
       worker.postMessage(msg.data, msg.transfer);
     });
+  },
+
+  equirectangularToLatLon(x, y, width, height) {
+    return {
+      lambda: (x / width) * 2 * Math.PI - Math.PI,
+      phi: Math.PI / 2 - (y / height) * Math.PI,
+    };
+  },
+
+  latLonToEquirectangular(lambda, phi, width, height) {
+    const wMax = width - 1;
+    const hMax = height - 1;
+    return {
+      x: ((lambda + Math.PI) / (2 * Math.PI)) * wMax,
+      y: ((Math.PI / 2 - phi) / Math.PI) * hMax,
+    };
+  },
+
+  projectedToPixel(x, y, bounds, width, height) {
+    const wMax = width - 1;
+    const hMax = height - 1;
+    return {
+      x: ((x - bounds.xMin) / (bounds.xMax - bounds.xMin)) * wMax,
+      y: ((bounds.yMax - y) / (bounds.yMax - bounds.yMin)) * hMax,
+    };
+  },
+
+  pixelToProjected(x, y, bounds, width, height) {
+    return {
+      x:
+        bounds.xMin +
+        (x / width) * (bounds.xMax - bounds.xMin),
+      y:
+        bounds.yMax -
+        (y / height) * (bounds.yMax - bounds.yMin),
+    };
+  },
+
+  sampleBilinear(src, srcW, srcH, px, py, out, oi) {
+    const srcWmax = srcW - 1;
+    const srcHmax = srcH - 1;
+
+    if (px < 0 || px > srcWmax || py < 0 || py > srcHmax) {
+      out[oi] = 0;
+      out[oi + 1] = 0;
+      out[oi + 2] = 0;
+      out[oi + 3] = 0;
+      return false;
+    }
+
+    const x0 = px | 0;
+    const y0 = py | 0;
+    let x1 = x0 + 1;
+    if (x1 > srcWmax) x1 = srcWmax;
+    let y1 = y0 + 1;
+    if (y1 > srcHmax) y1 = srcHmax;
+
+    const dx = px - x0;
+    const dy = py - y0;
+    const w00 = (1 - dx) * (1 - dy);
+    const w10 = dx * (1 - dy);
+    const w01 = (1 - dx) * dy;
+    const w11 = dx * dy;
+
+    const i00 = (y0 * srcW + x0) * 4;
+    const i10 = (y0 * srcW + x1) * 4;
+    const i01 = (y1 * srcW + x0) * 4;
+    const i11 = (y1 * srcW + x1) * 4;
+
+    out[oi] =
+      src[i00] * w00 + src[i10] * w10 + src[i01] * w01 + src[i11] * w11;
+    out[oi + 1] =
+      src[i00 + 1] * w00 +
+      src[i10 + 1] * w10 +
+      src[i01 + 1] * w01 +
+      src[i11 + 1] * w11;
+    out[oi + 2] =
+      src[i00 + 2] * w00 +
+      src[i10 + 2] * w10 +
+      src[i01 + 2] * w01 +
+      src[i11 + 2] * w11;
+    out[oi + 3] =
+      src[i00 + 3] * w00 +
+      src[i10 + 3] * w10 +
+      src[i01 + 3] * w01 +
+      src[i11 + 3] * w11;
+
+    return true;
   },
 
   renderOverlayMask(ctx, width, height, drawCutouts) {

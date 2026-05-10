@@ -89,3 +89,69 @@ function mollweideConvertPixels(src, srcW, srcH) {
 
   return { out: out, width: outW, height: outH };
 }
+
+function mollweideConvertFromEquirectangularPixels(src, srcW, srcH) {
+  const aspectRatio = MOLLWEIDE_X_MAX / MOLLWEIDE_Y_MAX;
+  const outW = srcW;
+  const outH = Math.round(outW / aspectRatio);
+  const out = new Uint8ClampedArray(outW * outH * 4);
+  const bounds = {
+    xMin: -MOLLWEIDE_X_MAX,
+    xMax: MOLLWEIDE_X_MAX,
+    yMin: -MOLLWEIDE_Y_MAX,
+    yMax: MOLLWEIDE_Y_MAX,
+  };
+
+  for (let y = 0; y < outH; y++) {
+    const outRowBase = y * outW * 4;
+    for (let x = 0; x < outW; x++) {
+      const proj = ProjectionUtils.pixelToProjected(x, y, bounds, outW, outH);
+      const ellipseCheck =
+        (proj.x * proj.x) / (MOLLWEIDE_X_MAX * MOLLWEIDE_X_MAX) +
+        (proj.y * proj.y) / (MOLLWEIDE_Y_MAX * MOLLWEIDE_Y_MAX);
+
+      if (ellipseCheck > 1) {
+        const oi = outRowBase + x * 4;
+        out[oi] = 0;
+        out[oi + 1] = 0;
+        out[oi + 2] = 0;
+        out[oi + 3] = 0;
+        continue;
+      }
+
+      const theta = Math.asin(
+        Math.max(-1, Math.min(1, proj.y / MOLLWEIDE_SQRT2)),
+      );
+      const phi = Math.asin(
+        Math.max(
+          -1,
+          Math.min(1, (2 * theta + Math.sin(2 * theta)) / Math.PI),
+        ),
+      );
+      const cosTheta = Math.cos(theta);
+      let lambda = 0;
+      if (Math.abs(cosTheta) > 1e-8) {
+        lambda = (Math.PI * proj.x) / (2 * MOLLWEIDE_SQRT2 * cosTheta);
+      }
+      lambda = Math.max(-Math.PI, Math.min(Math.PI, lambda));
+
+      const srcPos = ProjectionUtils.latLonToEquirectangular(
+        lambda,
+        phi,
+        srcW,
+        srcH,
+      );
+      ProjectionUtils.sampleBilinear(
+        src,
+        srcW,
+        srcH,
+        srcPos.x,
+        srcPos.y,
+        out,
+        outRowBase + x * 4,
+      );
+    }
+  }
+
+  return { out: out, width: outW, height: outH };
+}

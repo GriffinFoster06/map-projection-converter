@@ -11,6 +11,23 @@ function winkelTripelToEquirectangular(image) {
   return canvas;
 }
 
+function equirectangularToWinkelTripel(image) {
+  const src = ProjectionUtils.getSourceData(image).data;
+  const result = winkelTripelConvertFromEquirectangularPixels(
+    src,
+    image.width,
+    image.height,
+  );
+  const canvas = document.createElement("canvas");
+  canvas.width = result.width;
+  canvas.height = result.height;
+  const ctx = canvas.getContext("2d");
+  const imgData = ctx.createImageData(result.width, result.height);
+  imgData.data.set(result.out);
+  ctx.putImageData(imgData, 0, 0);
+  return canvas;
+}
+
 const winkelTripel = {
   id: "winkel-tripel",
   name: "Winkel Tripel",
@@ -66,19 +83,48 @@ const winkelTripel = {
     );
   },
 
-  convert(image) {
+  toEquirectangular(image) {
     return winkelTripelToEquirectangular(
       ProjectionUtils.downscaleForPreview(image),
     );
   },
 
-  convertFullRes(image) {
+  fromEquirectangular(image) {
+    return equirectangularToWinkelTripel(
+      ProjectionUtils.downscaleForPreview(image),
+    );
+  },
+
+  toEquirectangularFullRes(image) {
     return ProjectionUtils.convertWithWorker(
       image,
       "projections/winkel-tripel/winkel-tripel-worker.js",
       function (sourceData, img) {
         return {
-          data: { src: sourceData.data, width: img.width, height: img.height },
+          data: {
+            src: sourceData.data,
+            width: img.width,
+            height: img.height,
+            direction: "to-equirectangular",
+          },
+          transfer: [sourceData.data.buffer],
+        };
+      },
+    );
+  },
+
+  fromEquirectangularFullRes(image) {
+    return ProjectionUtils.convertWithWorker(
+      image,
+      "projections/winkel-tripel/winkel-tripel-worker.js",
+      function (sourceData, img) {
+        return {
+          data: {
+            src: sourceData.data,
+            width: img.width,
+            height: img.height,
+            direction: "from-equirectangular",
+          },
           transfer: [sourceData.data.buffer],
         };
       },

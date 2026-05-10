@@ -11,6 +11,23 @@ function mollweideToEquirectangular(image) {
   return canvas;
 }
 
+function equirectangularToMollweide(image) {
+  const src = ProjectionUtils.getSourceData(image).data;
+  const result = mollweideConvertFromEquirectangularPixels(
+    src,
+    image.width,
+    image.height,
+  );
+  const canvas = document.createElement("canvas");
+  canvas.width = result.width;
+  canvas.height = result.height;
+  const ctx = canvas.getContext("2d");
+  const imgData = ctx.createImageData(result.width, result.height);
+  imgData.data.set(result.out);
+  ctx.putImageData(imgData, 0, 0);
+  return canvas;
+}
+
 const mollweide = {
   id: "mollweide",
   name: "Mollweide",
@@ -66,19 +83,48 @@ const mollweide = {
     );
   },
 
-  convert(image) {
+  toEquirectangular(image) {
     return mollweideToEquirectangular(
       ProjectionUtils.downscaleForPreview(image),
     );
   },
 
-  convertFullRes(image) {
+  fromEquirectangular(image) {
+    return equirectangularToMollweide(
+      ProjectionUtils.downscaleForPreview(image),
+    );
+  },
+
+  toEquirectangularFullRes(image) {
     return ProjectionUtils.convertWithWorker(
       image,
       "projections/mollweide/mollweide-worker.js",
       function (sourceData, img) {
         return {
-          data: { src: sourceData.data, width: img.width, height: img.height },
+          data: {
+            src: sourceData.data,
+            width: img.width,
+            height: img.height,
+            direction: "to-equirectangular",
+          },
+          transfer: [sourceData.data.buffer],
+        };
+      },
+    );
+  },
+
+  fromEquirectangularFullRes(image) {
+    return ProjectionUtils.convertWithWorker(
+      image,
+      "projections/mollweide/mollweide-worker.js",
+      function (sourceData, img) {
+        return {
+          data: {
+            src: sourceData.data,
+            width: img.width,
+            height: img.height,
+            direction: "from-equirectangular",
+          },
           transfer: [sourceData.data.buffer],
         };
       },

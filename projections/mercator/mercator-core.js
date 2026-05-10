@@ -64,3 +64,37 @@ function mercatorConvertPixels(src, srcW, srcH) {
 
   return { out: out, width: outW, height: outH };
 }
+
+function mercatorConvertFromEquirectangularPixels(src, srcW, srcH) {
+  const outW = srcW;
+  const outH = srcW;
+  const out = new Uint8ClampedArray(outW * outH * 4);
+
+  for (let y = 0; y < outH; y++) {
+    const mercatorY = y / outH;
+    const expY = MERCATOR_Y_MAX - 2 * MERCATOR_Y_MAX * mercatorY;
+    const phi = 2 * Math.atan(Math.exp(expY)) - Math.PI / 2;
+    const outRowBase = y * outW * 4;
+
+    for (let x = 0; x < outW; x++) {
+      const lambda = (x / outW) * 2 * Math.PI - Math.PI;
+      const srcPos = ProjectionUtils.latLonToEquirectangular(
+        lambda,
+        phi,
+        srcW,
+        srcH,
+      );
+      ProjectionUtils.sampleBilinear(
+        src,
+        srcW,
+        srcH,
+        srcPos.x,
+        srcPos.y,
+        out,
+        outRowBase + x * 4,
+      );
+    }
+  }
+
+  return { out: out, width: outW, height: outH };
+}
