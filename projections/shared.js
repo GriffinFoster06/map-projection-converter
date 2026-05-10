@@ -186,13 +186,13 @@ const ProjectionUtils = {
   },
 
   pixelToProjected(x, y, bounds, width, height) {
+    const wMax = width - 1;
+    const hMax = height - 1;
+    const xRatio = wMax > 0 ? x / wMax : 0;
+    const yRatio = hMax > 0 ? y / hMax : 0;
     return {
-      x:
-        bounds.xMin +
-        (x / width) * (bounds.xMax - bounds.xMin),
-      y:
-        bounds.yMax -
-        (y / height) * (bounds.yMax - bounds.yMin),
+      x: bounds.xMin + xRatio * (bounds.xMax - bounds.xMin),
+      y: bounds.yMax - yRatio * (bounds.yMax - bounds.yMin),
     };
   },
 
