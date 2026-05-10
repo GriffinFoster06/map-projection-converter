@@ -4,6 +4,11 @@ const fs = require("node:fs");
 const path = require("node:path");
 const vm = require("node:vm");
 
+const ROUND_TRIP_TOLERANCE = 0.02;
+const PIXEL_PRECISION = 1e-6;
+const BLEND_EXPECTED = 127.5;
+const BLEND_TOLERANCE = 1;
+
 function loadProjectionUtils() {
   const sharedPath = path.join(__dirname, "..", "projections", "shared.js");
   const code = fs.readFileSync(sharedPath, "utf8");
@@ -40,8 +45,8 @@ test("equirectangular mapping round-trips lat/lon", () => {
     height,
   );
 
-  assert.ok(Math.abs(ll.lambda - lambda) < 0.02);
-  assert.ok(Math.abs(ll.phi - phi) < 0.02);
+  assert.ok(Math.abs(ll.lambda - lambda) < ROUND_TRIP_TOLERANCE);
+  assert.ok(Math.abs(ll.phi - phi) < ROUND_TRIP_TOLERANCE);
 });
 
 test("projection bounds helpers invert consistently", () => {
@@ -66,8 +71,8 @@ test("projection bounds helpers invert consistently", () => {
     height,
   );
 
-  assert.ok(Math.abs(roundTrip.x - pixel.x) < 1e-6);
-  assert.ok(Math.abs(roundTrip.y - pixel.y) < 1e-6);
+  assert.ok(Math.abs(roundTrip.x - pixel.x) < PIXEL_PRECISION);
+  assert.ok(Math.abs(roundTrip.y - pixel.y) < PIXEL_PRECISION);
 });
 
 test("bilinear sampling blends nearby pixels", () => {
@@ -81,9 +86,9 @@ test("bilinear sampling blends nearby pixels", () => {
   const ok = ProjectionUtils.sampleBilinear(src, 2, 2, 0.5, 0.5, out, 0);
 
   assert.equal(ok, true);
-  assert.ok(Math.abs(out[0] - 127.5) < 1);
-  assert.ok(Math.abs(out[1] - 127.5) < 1);
-  assert.ok(Math.abs(out[2] - 127.5) < 1);
+  assert.ok(Math.abs(out[0] - BLEND_EXPECTED) < BLEND_TOLERANCE);
+  assert.ok(Math.abs(out[1] - BLEND_EXPECTED) < BLEND_TOLERANCE);
+  assert.ok(Math.abs(out[2] - BLEND_EXPECTED) < BLEND_TOLERANCE);
   assert.equal(out[3], 255);
 });
 
