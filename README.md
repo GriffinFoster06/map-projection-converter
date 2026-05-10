@@ -1,6 +1,6 @@
 # Map projection converter
 
-Most softwares don't support converting map projections back to equirectangular, so this is a half-assed solution to that. It now also supports converting equirectangular maps into other projections.
+Most software doesn't support converting map projections back to equirectangular, so this is a half-assed solution to that. It now also supports converting equirectangular maps into other projections.
 
 Currently supported projections:
 
