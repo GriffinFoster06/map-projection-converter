@@ -182,14 +182,14 @@ function nicolosiConvertFromEquirectangularPixels(src, srcW, srcH) {
 
   for (let y = 0; y < outH; y++) {
     const outRowBase = y * outW * 4;
-    const ny = 1 - (y / hemiMax) * 2;
+    const normalizedY = 1 - (y / hemiMax) * 2;
 
     for (let x = 0; x < outW; x++) {
       const isLeft = x < hemi;
       const localX = isLeft ? x : x - hemi;
-      const nx = (localX / hemiMax) * 2 - 1;
+      const normalizedX = (localX / hemiMax) * 2 - 1;
 
-      const inv = nicolosiInverse(nx, ny);
+      const inv = nicolosiInverse(normalizedX, normalizedY);
       if (!inv) {
         const oi = outRowBase + x * 4;
         out[oi] = 0;
