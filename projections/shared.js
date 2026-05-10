@@ -161,9 +161,13 @@ const ProjectionUtils = {
   },
 
   equirectangularToLatLon(x, y, width, height) {
+    const wMax = width - 1;
+    const hMax = height - 1;
+    const xRatio = wMax > 0 ? x / wMax : 0;
+    const yRatio = hMax > 0 ? y / hMax : 0;
     return {
-      lambda: (x / width) * 2 * Math.PI - Math.PI,
-      phi: Math.PI / 2 - (y / height) * Math.PI,
+      lambda: xRatio * 2 * Math.PI - Math.PI,
+      phi: Math.PI / 2 - yRatio * Math.PI,
     };
   },
 
